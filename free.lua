@@ -62,12 +62,13 @@ local SecretFishList = {
     "Frostmoon Whale", "Crystal Goliath", "Eggy Enchant Stone", "Dark Megalodon",
     "Elemental Tempestray", "Glacial Serpent", "Caustic Maw", "Coral Reaper",
     "Sunken Hadalith", "Trench Warden", "Caeruleum Razerback", "Two-headed shark", "Ragnarex",
-    "Colossal Shipwreck Crab", "Astrelle", "Moonwake Ray", "Astralune",
+    "Colossal Shipwreck Crab", "Astrelle", "Moonwake Ray", "Astralune", "Starglass Guardian", "Pelagon", "Crimson Dreadtusk", "Riftborn Arowana",
+    "Pyrocoil", "Stormshell Brute", "Wintertusk Mammofin", "Elemental Hydra", "Overlord Hydra", "Tribunal Withering core", "Ashen Kingfish",
 }
 
 local ForgottenList = {
     "Sea Eater", "Thunderzilla", "Iridesca", "Frostbite Leviathan", "Fluorivane",
-    "Cerulean Dragon", "Crystalline Behemoth", "Trench Warden", "Ragnarex", "Astralune",
+    "Cerulean Dragon", "Crystalline Behemoth", "Trench Warden", "Ragnarex", "Astralune", "Crimson Dreadtusk", "Elemental Hydra", "Overlord Hydra",
 }
 
 local LegendaryCrystalList = {
@@ -104,7 +105,15 @@ local FishChanceData = {
     ["Dark Megalodon"] = "1 in 8M", ["Caustic Maw"] = "1 in 4M", ["Coral Reaper"] = "1 in 6M",
     ["Sunken Hadalith"] = "1 in ??", ["Trench Warden"] = "1 in 15M", ["Caeruleum Razerback"] = "1 in 3M",
     ["Two-headed shark"] = "1 in 3M", ["Ragnarex"] = "1 in 35M", ["Colossal Shipwreck Crab"] = "1 in 5M",
-    ["Astrelle"] = "1 in 6M", ["Moonwake Ray"] = "1 in 5M", ["Astralune"] = "1 in 20M",
+    ["Astrelle"] = "1 in 6M", ["Moonwake Ray"] = "1 in 5M", ["Astralune"] = "1 in 20M", ["Riftborn Arowana"] = "1 in 4.5M",
+    ["Pyrocoil"] = "1 in 4M",
+    ["Stormshell Brute"] = "1 in 4M",
+    ["Wintertusk Mammofin"] = "1 in 4M",
+    ["Crimson Dreadtusk"] ="1 in 20M",
+    ["Elemental Hydra"] = "1 in 40M",
+    ["Overlord Hydra"] = "1 in 45M",
+    ["Tribunal Withering Core"] = "1 in 5M",
+
 }
 
 local NP = "https://raw.githubusercontent.com/revkatomy-max/new-pisit-image/main/"
@@ -146,6 +155,13 @@ local FishImageURL = {
     ["Astrelle"] = NP.."Astrlele.png", -- cek nama file asli di repo kalau gambar gak muncul
     ["Astralune"] = NP.."1000188338.png",
     ["Moonwake Ray"] = NP.."1000188340.png",
+    ["Riftborn Arowana"] = "https://raw.githubusercontent.com/revkatomy-max/new-pisit-image/main/1000195428.png",
+["Pyrocoil"] = "https://raw.githubusercontent.com/revkatomy-max/new-pisit-image/main/115.png",
+["Stormshell Brute"] = "https://raw.githubusercontent.com/revkatomy-max/new-pisit-image/main/114.png",
+["Wintertusk Mammofin"] = "https://raw.githubusercontent.com/revkatomy-max/new-pisit-image/main/113.png",
+["Crimson Dreadtusk"] = "https://raw.githubusercontent.com/revkatomy-max/new-pisit-image/main/1000195427.png",
+["Overlord Hydra"] = "https://raw.githubusercontent.com/revkatomy-max/new-pisit-image/main/51072.png",
+["Elemental Hydra"] = "https://raw.githubusercontent.com/revkatomy-max/new-pisit-image/main/51076.png",
 }
 
 local FishImageURLLower = {}
