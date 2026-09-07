@@ -112,6 +112,7 @@ local FishChanceData = {
     ["Crimson Dreadtusk"] ="1 in 20M",
     ["Elemental Hydra"] = "1 in 40M",
     ["Overlord Hydra"] = "1 in 45M",
+    ["Ashen Kingfish"] = "1 in 3.5M",
     ["Tribunal Withering Core"] = "1 in 5M",
 
 }
@@ -161,6 +162,8 @@ local FishImageURL = {
 ["Wintertusk Mammofin"] = "https://raw.githubusercontent.com/revkatomy-max/new-pisit-image/main/113.png",
 ["Crimson Dreadtusk"] = "https://raw.githubusercontent.com/revkatomy-max/new-pisit-image/main/1000195427.png",
 ["Overlord Hydra"] = "https://raw.githubusercontent.com/revkatomy-max/new-pisit-image/main/51072.png",
+["Elemental Hydra"] = "https://raw.githubusercontent.com/revkatomy-max/new-pisit-image/main/51076.png",
+["Ashen Kingfish"] = "https://raw.githubusercontent.com/revkatomy-max/new-pisit-image/main/Ashen%20Kingfish.webp",
 ["Elemental Hydra"] = "https://raw.githubusercontent.com/revkatomy-max/new-pisit-image/main/51076.png",
 }
 
