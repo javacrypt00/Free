@@ -14,7 +14,6 @@ local TweenService      = game:GetService("TweenService")
 -- ============================================================
 
 local WEBHOOK_URL         = "" -- join / leave / monitor started
-local WEBHOOK_STATS       = "" -- fallback buat Check Player kalau WEBHOOK_CHECKPLAYER kosong
 local WEBHOOK_FISH        = ""
 local WEBHOOK_CHECKPLAYER = ""
 local WEBHOOK_AVATAR      = ""
@@ -165,6 +164,7 @@ local FishImageURL = {
 ["Elemental Hydra"] = "https://raw.githubusercontent.com/revkatomy-max/new-pisit-image/main/51076.png",
 ["Ashen Kingfish"] = "https://raw.githubusercontent.com/revkatomy-max/new-pisit-image/main/Ashen%20Kingfish.webp",
 ["Elemental Hydra"] = "https://raw.githubusercontent.com/revkatomy-max/new-pisit-image/main/51076.png",
+["Tribunal Withering core"] = "https://raw.githubusercontent.com/revkatomy-max/new-pisit-image/main/Tribunal%20Withering%20Core.png",
 }
 
 local FishImageURLLower = {}
@@ -240,13 +240,12 @@ end
 
 local CONFIG_FILE = "bloxgank_config.json"
 
-local function SaveConfig(joinUrl, fishUrl, statsUrl, checkplayerUrl)
+local function SaveConfig(joinUrl, fishUrl, checkplayerUrl)
     if not writefile then return end
     pcall(function()
         writefile(CONFIG_FILE, HttpService:JSONEncode({
             webhook_join        = joinUrl        or "",
             webhook_fish        = fishUrl        or "",
-            webhook_stats       = statsUrl       or "",
             webhook_checkplayer = checkplayerUrl or "",
         }))
     end)
@@ -450,8 +449,7 @@ local function SendFishWebhook(title, description, color, fields, imageUrl, thum
 end
 
 local function SendPlayerCheckWebhook()
-    local url = (WEBHOOK_CHECKPLAYER ~= "") and WEBHOOK_CHECKPLAYER
-        or ((WEBHOOK_STATS ~= "") and WEBHOOK_STATS or WEBHOOK_URL)
+    local url = (WEBHOOK_CHECKPLAYER ~= "") and WEBHOOK_CHECKPLAYER or WEBHOOK_URL
     if url == "" then return end
 
     local description = BuildPlayerCheckDescription()
@@ -685,53 +683,113 @@ end
 -- ============================================================
 
 local function HoverTween(btn, hoverColor, baseColor)
-    btn.MouseEnter:Connect(function() TweenService:Create(btn, TweenInfo.new(0.1), { BackgroundColor3 = hoverColor }):Play() end)
-    btn.MouseLeave:Connect(function() TweenService:Create(btn, TweenInfo.new(0.1), { BackgroundColor3 = baseColor  }):Play() end)
+    btn.MouseEnter:Connect(function() TweenService:Create(btn, TweenInfo.new(0.12), { BackgroundColor3 = hoverColor }):Play() end)
+    btn.MouseLeave:Connect(function() TweenService:Create(btn, TweenInfo.new(0.12), { BackgroundColor3 = baseColor  }):Play() end)
+end
+
+-- Palette modern (dark, accent blurple)
+local BG_MAIN       = Color3.fromRGB(17, 17, 23)
+local BG_TOPBAR      = Color3.fromRGB(22, 22, 29)
+local BG_CARD        = Color3.fromRGB(27, 27, 35)
+local BG_CARD_HOVER  = Color3.fromRGB(34, 34, 44)
+local BORDER_SUBTLE  = Color3.fromRGB(45, 45, 56)
+local ACCENT         = Color3.fromRGB(114, 130, 240)
+local ACCENT_DIM     = Color3.fromRGB(70, 78, 130)
+local TEXT_PRIMARY   = Color3.fromRGB(235, 235, 242)
+local TEXT_SECONDARY = Color3.fromRGB(140, 140, 158)
+local SUCCESS        = Color3.fromRGB(76, 224, 137)
+local DANGER         = Color3.fromRGB(235, 80, 90)
+
+local function AddShadow(target, sizeBoost)
+    local shadow = Instance.new("ImageLabel")
+    shadow.Name              = "Shadow"
+    shadow.BackgroundTransparency = 1
+    shadow.Image             = "rbxassetid://6014261993"
+    shadow.ImageColor3       = Color3.fromRGB(0, 0, 0)
+    shadow.ImageTransparency = 0.45
+    shadow.ScaleType         = Enum.ScaleType.Slice
+    shadow.SliceCenter       = Rect.new(49, 49, 450, 450)
+    shadow.Size              = UDim2.new(1, sizeBoost or 34, 1, sizeBoost or 34)
+    shadow.Position          = UDim2.new(0.5, 0, 0.5, 0)
+    shadow.AnchorPoint       = Vector2.new(0.5, 0.5)
+    shadow.ZIndex            = (target.ZIndex or 1) - 1
+    shadow.Parent            = target.Parent
+    return shadow
 end
 
 local function CreateMainUI(gui)
     local savedConfig = LoadConfig()
 
-    local FRAME_H = 340
+    local FRAME_H = 304
     local frame = Instance.new("Frame")
     frame.Name             = "Main"
     frame.Size             = UDim2.new(0, 300, 0, FRAME_H)
-    frame.AnchorPoint       = Vector2.new(0.5, 0.5)
-    frame.Position          = UDim2.new(0.5, 0, 0.5, 0)
-    frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    frame.AnchorPoint      = Vector2.new(0.5, 0.5)
+    frame.Position         = UDim2.new(0.5, 0, 0.5, 0)
+    frame.BackgroundColor3 = BG_MAIN
     frame.BorderSizePixel  = 0
     frame.ClipsDescendants = true
+    frame.ZIndex           = 2
     frame.Parent           = gui
-    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 16)
 
     local stroke = Instance.new("UIStroke")
-    stroke.Color = Color3.fromRGB(50, 50, 50); stroke.Thickness = 1; stroke.Parent = frame
+    stroke.Color = BORDER_SUBTLE; stroke.Thickness = 1; stroke.Transparency = 0.2; stroke.Parent = frame
+
+    AddShadow(frame, 44)
 
     local topBar = Instance.new("Frame")
-    topBar.Size = UDim2.new(1, 0, 0, 36); topBar.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    topBar.Size = UDim2.new(1, 0, 0, 44); topBar.BackgroundColor3 = BG_TOPBAR
     topBar.BorderSizePixel = 0; topBar.Parent = frame
-    Instance.new("UICorner", topBar).CornerRadius = UDim.new(0, 8)
+    Instance.new("UICorner", topBar).CornerRadius = UDim.new(0, 16)
 
     local topBarFix = Instance.new("Frame")
-    topBarFix.Size = UDim2.new(1, 0, 0, 8); topBarFix.Position = UDim2.new(0, 0, 1, -8)
-    topBarFix.BackgroundColor3 = Color3.fromRGB(30, 30, 30); topBarFix.BorderSizePixel = 0; topBarFix.Parent = topBar
+    topBarFix.Size = UDim2.new(1, 0, 0, 16); topBarFix.Position = UDim2.new(0, 0, 1, -16)
+    topBarFix.BackgroundColor3 = BG_TOPBAR; topBarFix.BorderSizePixel = 0; topBarFix.Parent = topBar
+
+    local topAccentLine = Instance.new("Frame")
+    topAccentLine.Size = UDim2.new(1, 0, 0, 2); topAccentLine.Position = UDim2.new(0, 0, 1, -2)
+    topAccentLine.BorderSizePixel = 0; topAccentLine.BackgroundColor3 = ACCENT; topAccentLine.Parent = topBar
+    local topAccentGradient = Instance.new("UIGradient")
+    topAccentGradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, ACCENT),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(160, 130, 240)),
+        ColorSequenceKeypoint.new(1, ACCENT),
+    })
+    topAccentGradient.Parent = topAccentLine
+
+    local titleDot = Instance.new("Frame")
+    titleDot.Size = UDim2.new(0, 6, 0, 6); titleDot.Position = UDim2.new(0, 14, 0.5, -3)
+    titleDot.BackgroundColor3 = ACCENT; titleDot.BorderSizePixel = 0; titleDot.Parent = topBar
+    Instance.new("UICorner", titleDot).CornerRadius = UDim.new(1, 0)
 
     local title = Instance.new("TextLabel")
-    title.Text = "BLOX GANK MONITOR"; title.Size = UDim2.new(1, -80, 1, 0); title.Position = UDim2.new(0, 10, 0, 0)
-    title.BackgroundTransparency = 1; title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    title.Text = "BLOX GANK"; title.Size = UDim2.new(1, -100, 0, 16); title.Position = UDim2.new(0, 28, 0, 8)
+    title.BackgroundTransparency = 1; title.TextColor3 = TEXT_PRIMARY
     title.Font = Enum.Font.GothamBold; title.TextSize = 13; title.TextXAlignment = Enum.TextXAlignment.Left; title.Parent = topBar
 
-    local function MakeWinBtn(text, xOffset, bgColor)
+    local subtitle = Instance.new("TextLabel")
+    subtitle.Text = "SERVER MONITOR"; subtitle.Size = UDim2.new(1, -100, 0, 12); subtitle.Position = UDim2.new(0, 28, 0, 23)
+    subtitle.BackgroundTransparency = 1; subtitle.TextColor3 = TEXT_SECONDARY
+    subtitle.Font = Enum.Font.Gotham; subtitle.TextSize = 9; subtitle.TextXAlignment = Enum.TextXAlignment.Left; subtitle.Parent = topBar
+
+    local function MakeWinBtn(text, xOffset, hoverColor)
         local btn = Instance.new("TextButton")
-        btn.Text = text; btn.Size = UDim2.new(0, 28, 0, 22); btn.Position = UDim2.new(1, xOffset, 0.5, -11)
-        btn.BackgroundColor3 = bgColor; btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        btn.Font = Enum.Font.GothamBold; btn.TextSize = 12; btn.BorderSizePixel = 0; btn.Parent = topBar
-        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+        btn.Text = text; btn.Size = UDim2.new(0, 26, 0, 26); btn.Position = UDim2.new(1, xOffset, 0.5, -13)
+        btn.BackgroundColor3 = BG_TOPBAR; btn.BackgroundTransparency = 1; btn.TextColor3 = TEXT_SECONDARY
+        btn.Font = Enum.Font.GothamBold; btn.TextSize = 13; btn.BorderSizePixel = 0; btn.Parent = topBar
+        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+        btn.MouseEnter:Connect(function()
+            TweenService:Create(btn, TweenInfo.new(0.12), { BackgroundTransparency = 0, BackgroundColor3 = hoverColor, TextColor3 = Color3.fromRGB(255,255,255) }):Play()
+        end)
+        btn.MouseLeave:Connect(function()
+            TweenService:Create(btn, TweenInfo.new(0.12), { BackgroundTransparency = 1, TextColor3 = TEXT_SECONDARY }):Play()
+        end)
         return btn
     end
 
-    local minBtn   = MakeWinBtn("_", -58, Color3.fromRGB(60, 60, 60))
-    local closeBtn = MakeWinBtn("X", -28, Color3.fromRGB(200, 50, 50))
+    local minBtn   = MakeWinBtn("–", -60, BORDER_SUBTLE)
+    local closeBtn = MakeWinBtn("×", -30, DANGER)
 
     minBtn.MouseButton1Click:Connect(function() frame.Visible = false end)
 
@@ -740,33 +798,34 @@ local function CreateMainUI(gui)
     floatLogo.Name             = "BloxGankFloatLogo"
     floatLogo.Size             = UDim2.new(0, 46, 0, 46)
     floatLogo.Position         = UDim2.new(0, 20, 0, 90)
-    floatLogo.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    floatLogo.BackgroundColor3 = BG_MAIN
     floatLogo.Image            = BRAND_ICON
     floatLogo.ScaleType        = Enum.ScaleType.Crop
     floatLogo.BorderSizePixel  = 0
     floatLogo.ZIndex           = 5
     floatLogo.Parent           = gui
     Instance.new("UICorner", floatLogo).CornerRadius = UDim.new(1, 0)
+    AddShadow(floatLogo, 18)
 
     local floatStroke = Instance.new("UIStroke")
-    floatStroke.Color = Color3.fromRGB(50, 50, 50); floatStroke.Thickness = 2; floatStroke.Parent = floatLogo
+    floatStroke.Color = BORDER_SUBTLE; floatStroke.Thickness = 2; floatStroke.Parent = floatLogo
 
     local floatStatusDot = Instance.new("Frame")
     floatStatusDot.Size             = UDim2.new(0, 14, 0, 14)
     floatStatusDot.Position         = UDim2.new(1, -14, 1, -14)
-    floatStatusDot.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
+    floatStatusDot.BackgroundColor3 = DANGER
     floatStatusDot.BorderSizePixel  = 0
     floatStatusDot.ZIndex           = 6
     floatStatusDot.Parent           = floatLogo
     Instance.new("UICorner", floatStatusDot).CornerRadius = UDim.new(1, 0)
 
     local floatStatusDotStroke = Instance.new("UIStroke")
-    floatStatusDotStroke.Color = Color3.fromRGB(20, 20, 20); floatStatusDotStroke.Thickness = 2; floatStatusDotStroke.Parent = floatStatusDot
+    floatStatusDotStroke.Color = BG_MAIN; floatStatusDotStroke.Thickness = 2; floatStatusDotStroke.Parent = floatStatusDot
 
     local floatPulseTween = nil
     local function SetFloatStatus(active)
-        floatStatusDot.BackgroundColor3 = active and Color3.fromRGB(0, 220, 100) or Color3.fromRGB(255, 60, 60)
-        floatStroke.Color               = active and Color3.fromRGB(0, 220, 100) or Color3.fromRGB(50, 50, 50)
+        floatStatusDot.BackgroundColor3 = active and SUCCESS or DANGER
+        floatStroke.Color               = active and SUCCESS or BORDER_SUBTLE
         if floatPulseTween then floatPulseTween:Cancel(); floatPulseTween = nil end
         floatStroke.Transparency = 0
         if active then
@@ -806,9 +865,6 @@ local function CreateMainUI(gui)
         task.wait(0.2); gui:Destroy()
     end)
 
-    HoverTween(minBtn,   Color3.fromRGB(80,80,80),  Color3.fromRGB(60,60,60))
-    HoverTween(closeBtn, Color3.fromRGB(230,70,70), Color3.fromRGB(200,50,50))
-
     local dragging, dragStart, startPos
     topBar.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -825,19 +881,27 @@ local function CreateMainUI(gui)
         end
     end)
 
+    -- Status chip
+    local statusChip = Instance.new("Frame")
+    statusChip.Size = UDim2.new(0, 118, 0, 22); statusChip.Position = UDim2.new(0, 12, 0, 52)
+    statusChip.BackgroundColor3 = BG_CARD; statusChip.BorderSizePixel = 0; statusChip.Parent = frame
+    Instance.new("UICorner", statusChip).CornerRadius = UDim.new(1, 0)
+    local statusChipStroke = Instance.new("UIStroke")
+    statusChipStroke.Color = BORDER_SUBTLE; statusChipStroke.Thickness = 1; statusChipStroke.Transparency = 0.3; statusChipStroke.Parent = statusChip
+
     local statusDot = Instance.new("Frame")
-    statusDot.Size = UDim2.new(0,8,0,8); statusDot.Position = UDim2.new(0,16,0,46)
-    statusDot.BackgroundColor3 = Color3.fromRGB(255,60,60); statusDot.BorderSizePixel = 0; statusDot.Parent = frame
+    statusDot.Size = UDim2.new(0,7,0,7); statusDot.Position = UDim2.new(0,10,0.5,-3.5)
+    statusDot.BackgroundColor3 = DANGER; statusDot.BorderSizePixel = 0; statusDot.Parent = statusChip
     Instance.new("UICorner", statusDot).CornerRadius = UDim.new(1,0)
 
     local statusLabel = Instance.new("TextLabel")
-    statusLabel.Text = "Tidak Aktif"; statusLabel.Size = UDim2.new(1,-40,0,20); statusLabel.Position = UDim2.new(0,30,0,38)
-    statusLabel.BackgroundTransparency = 1; statusLabel.TextColor3 = Color3.fromRGB(180,180,180)
-    statusLabel.Font = Enum.Font.Gotham; statusLabel.TextSize = 11
-    statusLabel.TextXAlignment = Enum.TextXAlignment.Left; statusLabel.Parent = frame
+    statusLabel.Text = "Tidak Aktif"; statusLabel.Size = UDim2.new(1,-28,1,0); statusLabel.Position = UDim2.new(0,24,0,0)
+    statusLabel.BackgroundTransparency = 1; statusLabel.TextColor3 = TEXT_SECONDARY
+    statusLabel.Font = Enum.Font.GothamMedium; statusLabel.TextSize = 11
+    statusLabel.TextXAlignment = Enum.TextXAlignment.Left; statusLabel.Parent = statusChip
 
-    local BOTTOM_BLOCK_H = 74
-    local SCROLL_Y        = 64
+    local BOTTOM_BLOCK_H = 78
+    local SCROLL_Y        = 84
 
     local content = Instance.new("ScrollingFrame")
     content.Name                   = "Content"
@@ -846,14 +910,14 @@ local function CreateMainUI(gui)
     content.BackgroundTransparency = 1
     content.BorderSizePixel        = 0
     content.ScrollBarThickness     = 3
-    content.ScrollBarImageColor3   = Color3.fromRGB(80, 80, 80)
+    content.ScrollBarImageColor3   = ACCENT
     content.CanvasSize             = UDim2.new(0, 0, 0, 0)
     content.Parent                 = frame
 
     local listLayout = Instance.new("UIListLayout")
     listLayout.FillDirection = Enum.FillDirection.Vertical
     listLayout.SortOrder     = Enum.SortOrder.LayoutOrder
-    listLayout.Padding       = UDim.new(0, 4)
+    listLayout.Padding       = UDim.new(0, 6)
     listLayout.Parent        = content
 
     local function UpdateCanvasSize()
@@ -862,51 +926,61 @@ local function CreateMainUI(gui)
     listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(UpdateCanvasSize)
 
     local listPad = Instance.new("UIPadding")
-    listPad.PaddingLeft   = UDim.new(0, 12)
-    listPad.PaddingRight  = UDim.new(0, 12)
+    listPad.PaddingLeft   = UDim.new(0, 14)
+    listPad.PaddingRight  = UDim.new(0, 14)
     listPad.PaddingTop    = UDim.new(0, 4)
     listPad.PaddingBottom = UDim.new(0, 6)
     listPad.Parent        = content
 
     local function MakeLabel(text)
         local lbl = Instance.new("TextLabel")
-        lbl.Text = text; lbl.Size = UDim2.new(1, 0, 0, 14)
-        lbl.BackgroundTransparency = 1; lbl.TextColor3 = Color3.fromRGB(130,130,130)
-        lbl.Font = Enum.Font.Gotham; lbl.TextSize = 10; lbl.TextXAlignment = Enum.TextXAlignment.Left
+        lbl.Text = string.upper(text); lbl.Size = UDim2.new(1, 0, 0, 14)
+        lbl.BackgroundTransparency = 1; lbl.TextColor3 = TEXT_SECONDARY
+        lbl.Font = Enum.Font.GothamMedium; lbl.TextSize = 9; lbl.TextXAlignment = Enum.TextXAlignment.Left
         lbl.Parent = content
         return lbl
     end
 
     local function MakeInput(placeholder)
         local box = Instance.new("TextBox")
-        box.PlaceholderText = placeholder; box.Size = UDim2.new(1, 0, 0, 28)
-        box.BackgroundColor3 = Color3.fromRGB(35,35,35); box.TextColor3 = Color3.fromRGB(220,220,220)
-        box.PlaceholderColor3 = Color3.fromRGB(100,100,100); box.Font = Enum.Font.Gotham; box.TextSize = 10
+        box.PlaceholderText = placeholder; box.Size = UDim2.new(1, 0, 0, 30)
+        box.BackgroundColor3 = BG_CARD; box.TextColor3 = TEXT_PRIMARY
+        box.PlaceholderColor3 = Color3.fromRGB(95,95,110); box.Font = Enum.Font.Gotham; box.TextSize = 10
         box.ClearTextOnFocus = false; box.BorderSizePixel = 0; box.Text = ""
         box.TextXAlignment = Enum.TextXAlignment.Left; box.ClipsDescendants = true; box.Parent = content
-        Instance.new("UICorner", box).CornerRadius = UDim.new(0,6)
-        local pad = Instance.new("UIPadding", box); pad.PaddingLeft = UDim.new(0,8); pad.PaddingRight = UDim.new(0,8)
+        Instance.new("UICorner", box).CornerRadius = UDim.new(0,8)
+        local pad = Instance.new("UIPadding", box); pad.PaddingLeft = UDim.new(0,10); pad.PaddingRight = UDim.new(0,10)
+        local boxStroke = Instance.new("UIStroke")
+        boxStroke.Color = BORDER_SUBTLE; boxStroke.Thickness = 1; boxStroke.Transparency = 0.2; boxStroke.Parent = box
+        box.Focused:Connect(function()
+            TweenService:Create(boxStroke, TweenInfo.new(0.12), { Color = ACCENT, Transparency = 0 }):Play()
+            TweenService:Create(box, TweenInfo.new(0.12), { BackgroundColor3 = BG_CARD_HOVER }):Play()
+        end)
+        box.FocusLost:Connect(function()
+            TweenService:Create(boxStroke, TweenInfo.new(0.12), { Color = BORDER_SUBTLE, Transparency = 0.2 }):Play()
+            TweenService:Create(box, TweenInfo.new(0.12), { BackgroundColor3 = BG_CARD }):Play()
+        end)
         return box
     end
 
     local function MakeToggleRow(labelText, defaultOn, onChange)
         local row = Instance.new("Frame")
-        row.Size = UDim2.new(1, 0, 0, 22); row.BackgroundTransparency = 1; row.Parent = content
+        row.Size = UDim2.new(1, 0, 0, 26); row.BackgroundTransparency = 1; row.Parent = content
 
         local lbl = Instance.new("TextLabel")
         lbl.Text = labelText; lbl.Size = UDim2.new(1, -44, 1, 0)
-        lbl.BackgroundTransparency = 1; lbl.TextColor3 = Color3.fromRGB(130,130,130)
-        lbl.Font = Enum.Font.Gotham; lbl.TextSize = 10; lbl.TextXAlignment = Enum.TextXAlignment.Left
+        lbl.BackgroundTransparency = 1; lbl.TextColor3 = TEXT_SECONDARY
+        lbl.Font = Enum.Font.GothamMedium; lbl.TextSize = 10.5; lbl.TextXAlignment = Enum.TextXAlignment.Left
         lbl.Parent = row
 
         local bg = Instance.new("Frame")
         bg.Size = UDim2.new(0,36,0,18); bg.Position = UDim2.new(1,-36,0.5,-9)
-        bg.BackgroundColor3 = Color3.fromRGB(60,60,60); bg.BorderSizePixel = 0; bg.Parent = row
+        bg.BackgroundColor3 = BORDER_SUBTLE; bg.BorderSizePixel = 0; bg.Parent = row
         Instance.new("UICorner", bg).CornerRadius = UDim.new(1,0)
 
         local knob = Instance.new("Frame")
         knob.Size = UDim2.new(0,14,0,14); knob.Position = UDim2.new(0,2,0.5,-7)
-        knob.BackgroundColor3 = Color3.fromRGB(200,200,200); knob.BorderSizePixel = 0; knob.Parent = bg
+        knob.BackgroundColor3 = Color3.fromRGB(220,220,228); knob.BorderSizePixel = 0; knob.Parent = bg
         Instance.new("UICorner", knob).CornerRadius = UDim.new(1,0)
 
         local hitbox = Instance.new("TextButton")
@@ -918,12 +992,12 @@ local function CreateMainUI(gui)
             state = enabled
             TweenService:Create(knob, TweenInfo.new(0.15), {
                 Position         = enabled and UDim2.new(0,20,0.5,-7) or UDim2.new(0,2,0.5,-7),
-                BackgroundColor3 = enabled and Color3.fromRGB(0,220,100) or Color3.fromRGB(200,200,200),
+                BackgroundColor3 = enabled and Color3.fromRGB(255,255,255) or Color3.fromRGB(220,220,228),
             }):Play()
             TweenService:Create(bg, TweenInfo.new(0.15), {
-                BackgroundColor3 = enabled and Color3.fromRGB(0,100,50) or Color3.fromRGB(60,60,60),
+                BackgroundColor3 = enabled and ACCENT or BORDER_SUBTLE,
             }):Play()
-            lbl.TextColor3 = enabled and Color3.fromRGB(0,220,100) or Color3.fromRGB(130,130,130)
+            lbl.TextColor3 = enabled and TEXT_PRIMARY or TEXT_SECONDARY
             if onChange then onChange(enabled) end
         end
 
@@ -936,10 +1010,8 @@ local function CreateMainUI(gui)
     local inputJoin  = MakeInput("Paste webhook join/leave...")
     MakeLabel("Webhook Secret Fish")
     local inputFish  = MakeInput("Paste webhook secret fish...")
-    MakeLabel("Webhook Stats (fallback Check Player)")
-    local inputStats = MakeInput("Paste webhook stats...")
     MakeLabel("Webhook Check Player")
-    local inputCheckplayer = MakeInput("Kosong = pakai webhook stats...")
+    local inputCheckplayer = MakeInput("Kosong = pakai webhook join...")
 
     local saveEnabled = false
     local saveToggle = MakeToggleRow("Simpan Config", false, function(enabled) saveEnabled = enabled end)
@@ -947,20 +1019,21 @@ local function CreateMainUI(gui)
     if savedConfig then
         if savedConfig.webhook_join        and savedConfig.webhook_join        ~= "" then inputJoin.Text        = savedConfig.webhook_join        end
         if savedConfig.webhook_fish        and savedConfig.webhook_fish        ~= "" then inputFish.Text        = savedConfig.webhook_fish        end
-        if savedConfig.webhook_stats       and savedConfig.webhook_stats       ~= "" then inputStats.Text       = savedConfig.webhook_stats       end
         if savedConfig.webhook_checkplayer and savedConfig.webhook_checkplayer ~= "" then inputCheckplayer.Text = savedConfig.webhook_checkplayer end
         saveToggle.setState(true)
     end
 
     local BTN_Y1 = FRAME_H - BOTTOM_BLOCK_H
-    local BTN_Y3 = BTN_Y1 + 26 + 6
+    local BTN_Y3 = BTN_Y1 + 28 + 8
 
     local checkBtn = Instance.new("TextButton")
-    checkBtn.Text = "CHECK PLAYER"; checkBtn.Size = UDim2.new(1,-24,0,26); checkBtn.Position = UDim2.new(0,12,0,BTN_Y1)
-    checkBtn.BackgroundColor3 = Color3.fromRGB(45,45,45); checkBtn.TextColor3 = Color3.fromRGB(220,220,220)
+    checkBtn.Text = "CHECK PLAYER"; checkBtn.Size = UDim2.new(1,-24,0,28); checkBtn.Position = UDim2.new(0,12,0,BTN_Y1)
+    checkBtn.BackgroundColor3 = BG_CARD; checkBtn.TextColor3 = TEXT_PRIMARY
     checkBtn.Font = Enum.Font.GothamBold; checkBtn.TextSize = 11; checkBtn.BorderSizePixel = 0; checkBtn.Parent = frame
-    Instance.new("UICorner", checkBtn).CornerRadius = UDim.new(0,6)
-    HoverTween(checkBtn, Color3.fromRGB(65,65,65), Color3.fromRGB(45,45,45))
+    Instance.new("UICorner", checkBtn).CornerRadius = UDim.new(0,9)
+    local checkBtnStroke = Instance.new("UIStroke")
+    checkBtnStroke.Color = BORDER_SUBTLE; checkBtnStroke.Thickness = 1; checkBtnStroke.Transparency = 0.2; checkBtnStroke.Parent = checkBtn
+    HoverTween(checkBtn, BG_CARD_HOVER, BG_CARD)
 
     checkBtn.MouseButton1Click:Connect(function()
         if not SCRIPT_ACTIVE then
@@ -976,8 +1049,8 @@ local function CreateMainUI(gui)
     end)
 
     local startBtn = Instance.new("TextButton")
-    startBtn.Text = "START MONITORING"; startBtn.Size = UDim2.new(1,-24,0,34); startBtn.Position = UDim2.new(0,12,0,BTN_Y3)
-    startBtn.BackgroundColor3 = Color3.fromRGB(0,180,100); startBtn.TextColor3 = Color3.fromRGB(255,255,255)
+    startBtn.Text = "START MONITORING"; startBtn.Size = UDim2.new(1,-24,0,36); startBtn.Position = UDim2.new(0,12,0,BTN_Y3)
+    startBtn.BackgroundColor3 = ACCENT; startBtn.TextColor3 = Color3.fromRGB(255,255,255)
     startBtn.Font = Enum.Font.GothamBold; startBtn.TextSize = 12; startBtn.BorderSizePixel = 0; startBtn.Parent = frame
     startBtn.TextScaled  = true
     startBtn.TextWrapped = false
@@ -987,35 +1060,42 @@ local function CreateMainUI(gui)
     local startBtnPad = Instance.new("UIPadding", startBtn)
     startBtnPad.PaddingLeft  = UDim.new(0,6)
     startBtnPad.PaddingRight = UDim.new(0,6)
-    Instance.new("UICorner", startBtn).CornerRadius = UDim.new(0,6)
-    HoverTween(startBtn, Color3.fromRGB(0,210,120), Color3.fromRGB(0,180,100))
+    Instance.new("UICorner", startBtn).CornerRadius = UDim.new(0,9)
+    local startBtnGradient = Instance.new("UIGradient")
+    startBtnGradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, ACCENT),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(150, 120, 235)),
+    })
+    startBtnGradient.Rotation = 20
+    startBtnGradient.Parent = startBtn
+    HoverTween(startBtn, Color3.fromRGB(130, 146, 250), ACCENT)
 
     startBtn.MouseButton1Click:Connect(function()
         if SCRIPT_ACTIVE then return end
 
         if not inputJoin.Text:find("discord.com/api/webhooks") then
-            startBtn.Text = "WEBHOOK JOIN INVALID"; startBtn.BackgroundColor3 = Color3.fromRGB(200,50,50)
-            task.wait(2); startBtn.Text = "START MONITORING"; startBtn.BackgroundColor3 = Color3.fromRGB(0,180,100)
+            startBtn.Text = "WEBHOOK JOIN INVALID"; startBtnGradient.Enabled = false; startBtn.BackgroundColor3 = DANGER
+            task.wait(2); startBtn.Text = "START MONITORING"; startBtnGradient.Enabled = true; startBtn.BackgroundColor3 = ACCENT
             return
         end
 
         WEBHOOK_URL = inputJoin.Text
         if inputFish.Text:find("discord.com/api/webhooks")        then WEBHOOK_FISH        = inputFish.Text        end
-        if inputStats.Text:find("discord.com/api/webhooks")       then WEBHOOK_STATS       = inputStats.Text       end
         if inputCheckplayer.Text:find("discord.com/api/webhooks") then WEBHOOK_CHECKPLAYER = inputCheckplayer.Text end
 
-        if saveEnabled then SaveConfig(WEBHOOK_URL, WEBHOOK_FISH, WEBHOOK_STATS, WEBHOOK_CHECKPLAYER) end
+        if saveEnabled then SaveConfig(WEBHOOK_URL, WEBHOOK_FISH, WEBHOOK_CHECKPLAYER) end
 
         SCRIPT_ACTIVE = true
-        statusDot.BackgroundColor3 = Color3.fromRGB(0,220,100)
+        statusDot.BackgroundColor3 = SUCCESS
         statusLabel.Text           = "Aktif - Monitoring..."
-        statusLabel.TextColor3     = Color3.fromRGB(0,220,100)
+        statusLabel.TextColor3     = SUCCESS
         startBtn.Text              = "MONITORING AKTIF"
-        startBtn.BackgroundColor3  = Color3.fromRGB(30,30,30)
+        startBtnGradient.Enabled   = false
+        startBtn.BackgroundColor3  = BG_CARD
 
         SetFloatStatus(true)
 
-        for _, box in ipairs({ inputJoin, inputFish, inputStats, inputCheckplayer }) do
+        for _, box in ipairs({ inputJoin, inputFish, inputCheckplayer }) do
             box.TextEditable = false
         end
         saveToggle.hitbox.Active = false
