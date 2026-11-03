@@ -856,20 +856,42 @@ local TEXT_SECONDARY = Color3.fromRGB(140, 140, 158)
 local SUCCESS        = Color3.fromRGB(76, 224, 137)
 local DANGER         = Color3.fromRGB(235, 80, 90)
 
+-- FIX: shadow tetap sibling (parent = target.Parent), tapi ukuran & posisinya
+-- di-sync ke target. Versi lama pakai Size = (1, boost) = 100% layar -> blackscreen.
 local function AddShadow(target, sizeBoost)
+    sizeBoost = sizeBoost or 34
+
     local shadow = Instance.new("ImageLabel")
-    shadow.Name              = "Shadow"
+    shadow.Name                   = "Shadow"
     shadow.BackgroundTransparency = 1
-    shadow.Image             = "rbxassetid://6014261993"
-    shadow.ImageColor3       = Color3.fromRGB(0, 0, 0)
-    shadow.ImageTransparency = 0.45
-    shadow.ScaleType         = Enum.ScaleType.Slice
-    shadow.SliceCenter       = Rect.new(49, 49, 450, 450)
-    shadow.Size              = UDim2.new(1, sizeBoost or 34, 1, sizeBoost or 34)
-    shadow.Position          = UDim2.new(0.5, 0, 0.5, 0)
-    shadow.AnchorPoint       = Vector2.new(0.5, 0.5)
-    shadow.ZIndex            = (target.ZIndex or 1) - 1
-    shadow.Parent            = target.Parent
+    shadow.Image                  = "rbxassetid://6014261993"
+    shadow.ImageColor3            = Color3.fromRGB(0, 0, 0)
+    shadow.ImageTransparency      = 0.45
+    shadow.ScaleType              = Enum.ScaleType.Slice
+    shadow.SliceCenter            = Rect.new(49, 49, 450, 450)
+    shadow.AnchorPoint            = target.AnchorPoint
+    shadow.ZIndex                 = math.max((target.ZIndex or 1) - 1, 0)
+    shadow.Parent                 = target.Parent
+
+    local function sync()
+        local a = target.AnchorPoint
+        shadow.AnchorPoint = a
+        shadow.Size = UDim2.new(
+            target.Size.X.Scale, target.Size.X.Offset + sizeBoost,
+            target.Size.Y.Scale, target.Size.Y.Offset + sizeBoost
+        )
+        shadow.Position = UDim2.new(
+            target.Position.X.Scale, target.Position.X.Offset + (a.X - 0.5) * sizeBoost,
+            target.Position.Y.Scale, target.Position.Y.Offset + (a.Y - 0.5) * sizeBoost
+        )
+        shadow.Visible = target.Visible
+    end
+
+    sync()
+    target:GetPropertyChangedSignal("Position"):Connect(sync)
+    target:GetPropertyChangedSignal("Size"):Connect(sync)
+    target:GetPropertyChangedSignal("Visible"):Connect(sync)
+
     return shadow
 end
 
@@ -1021,17 +1043,23 @@ local function CreateMainUI(gui)
         task.wait(0.2); gui:Destroy()
     end)
 
+    -- FIX: drag topBar sekarang support Touch (executor mobile)
     local dragging, dragStart, startPos
     topBar.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
             dragging, dragStart, startPos = true, input.Position, frame.Position
         end
     end)
     topBar.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
     end)
     game:GetService("UserInputService").InputChanged:Connect(function(input)
-        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch) then
             local delta = input.Position - dragStart
             frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset+delta.X, startPos.Y.Scale, startPos.Y.Offset+delta.Y)
         end
