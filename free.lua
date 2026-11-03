@@ -321,7 +321,7 @@ local FishImageURL = {
 ["Midnight Blue Wildes Shark"] = "https://raw.githubusercontent.com/revkatomy-max/new-pisit-image/main/IMG_5178.PNG",
 ["Sky Blue Talon Shark"] = "https://raw.githubusercontent.com/revkatomy-max/new-pisit-image/main/IMG_5179.PNG",
 ["Soulwake Express"] = "https://raw.githubusercontent.com/revkatomy-max/new-pisit-image/main/bg_soulwakeexpress.jpg",
-    
+
 }
 local FishImageURLLower = {}
 for k, v in pairs(FishImageURL) do FishImageURLLower[string.lower(k)] = v end
@@ -856,8 +856,7 @@ local TEXT_SECONDARY = Color3.fromRGB(140, 140, 158)
 local SUCCESS        = Color3.fromRGB(76, 224, 137)
 local DANGER         = Color3.fromRGB(235, 80, 90)
 
--- FIX: shadow tetap sibling (parent = target.Parent), tapi ukuran & posisinya
--- di-sync ke target. Versi lama pakai Size = (1, boost) = 100% layar -> blackscreen.
+-- Shadow tetap sibling (parent = target.Parent), ukuran & posisinya di-sync ke target.
 local function AddShadow(target, sizeBoost)
     sizeBoost = sizeBoost or 34
 
@@ -893,6 +892,18 @@ local function AddShadow(target, sizeBoost)
     target:GetPropertyChangedSignal("Visible"):Connect(sync)
 
     return shadow
+end
+
+-- Paksa ZIndex child selalu di atas parent (aman di mode Global maupun Sibling)
+local function FixZ(root, base)
+    local function depth(o)
+        local d = 0
+        while o and o ~= root do d = d + 1; o = o.Parent end
+        return d
+    end
+    for _, o in ipairs(root:GetDescendants()) do
+        if o:IsA("GuiObject") then o.ZIndex = base + depth(o) end
+    end
 end
 
 local function CreateMainUI(gui)
@@ -980,7 +991,7 @@ local function CreateMainUI(gui)
     floatLogo.Image            = BRAND_ICON
     floatLogo.ScaleType        = Enum.ScaleType.Crop
     floatLogo.BorderSizePixel  = 0
-    floatLogo.ZIndex           = 5
+    floatLogo.ZIndex           = 20
     floatLogo.Parent           = gui
     Instance.new("UICorner", floatLogo).CornerRadius = UDim.new(1, 0)
     AddShadow(floatLogo, 18)
@@ -993,7 +1004,7 @@ local function CreateMainUI(gui)
     floatStatusDot.Position         = UDim2.new(1, -14, 1, -14)
     floatStatusDot.BackgroundColor3 = DANGER
     floatStatusDot.BorderSizePixel  = 0
-    floatStatusDot.ZIndex           = 6
+    floatStatusDot.ZIndex           = 21
     floatStatusDot.Parent           = floatLogo
     Instance.new("UICorner", floatStatusDot).CornerRadius = UDim.new(1, 0)
 
@@ -1043,7 +1054,7 @@ local function CreateMainUI(gui)
         task.wait(0.2); gui:Destroy()
     end)
 
-    -- FIX: drag topBar sekarang support Touch (executor mobile)
+    -- Drag topBar (support Touch untuk executor mobile)
     local dragging, dragStart, startPos
     topBar.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1
@@ -1286,6 +1297,9 @@ local function CreateMainUI(gui)
 
         StartMonitoring()
     end)
+
+    -- Semua child frame dipaksa ZIndex lebih tinggi dari parent-nya
+    FixZ(frame, 2)
 end
 
 -- ============================================================
@@ -1293,9 +1307,10 @@ end
 -- ============================================================
 
 local mainGui = Instance.new("ScreenGui")
-mainGui.Name         = "BloxGankUI"
-mainGui.ResetOnSpawn = false
-mainGui.Parent       = (gethui and gethui()) or CoreGui
+mainGui.Name           = "BloxGankUI"
+mainGui.ResetOnSpawn   = false
+mainGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+mainGui.Parent         = (gethui and gethui()) or CoreGui
 
 local uiOk, uiErr = pcall(CreateMainUI, mainGui)
 if not uiOk then
