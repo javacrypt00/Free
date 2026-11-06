@@ -16,6 +16,7 @@ local TweenService      = game:GetService("TweenService")
 local WEBHOOK_URL         = "" -- join / leave / monitor started
 local WEBHOOK_FISH        = ""
 local WEBHOOK_CHECKPLAYER = ""
+local WEBHOOK_CLAN        = "" -- clan monitor (Fishing Crews)
 local WEBHOOK_AVATAR      = ""
 
 local PROXY = "https://square-haze-a007.remediashop.workers.dev"
@@ -321,7 +322,7 @@ local FishImageURL = {
 ["Midnight Blue Wildes Shark"] = "https://raw.githubusercontent.com/revkatomy-max/new-pisit-image/main/IMG_5178.PNG",
 ["Sky Blue Talon Shark"] = "https://raw.githubusercontent.com/revkatomy-max/new-pisit-image/main/IMG_5179.PNG",
 ["Soulwake Express"] = "https://raw.githubusercontent.com/revkatomy-max/new-pisit-image/main/bg_soulwakeexpress.jpg",
-
+    
 }
 local FishImageURLLower = {}
 for k, v in pairs(FishImageURL) do FishImageURLLower[string.lower(k)] = v end
@@ -396,13 +397,14 @@ end
 
 local CONFIG_FILE = "bloxgank_config.json"
 
-local function SaveConfig(joinUrl, fishUrl, checkplayerUrl)
+local function SaveConfig(joinUrl, fishUrl, checkplayerUrl, clanUrl)
     if not writefile then return end
     pcall(function()
         writefile(CONFIG_FILE, HttpService:JSONEncode({
             webhook_join        = joinUrl        or "",
             webhook_fish        = fishUrl        or "",
             webhook_checkplayer = checkplayerUrl or "",
+            webhook_clan        = clanUrl        or "",
         }))
     end)
 end
@@ -730,6 +732,213 @@ local function WatchForFish(player)
 end
 
 -- ============================================================
+--  CLAN MONITOR  (Fishing Crews lewat Replion, read-only)
+-- ============================================================
+
+local CLAN_POLL_SECONDS  = 20   -- cek member / level tiap N detik
+local CLAN_RECAP_MINUTES = 60   -- rekap poin berkala
+local CLAN_COLOR         = 5793266
+
+local ClanNameCache       = {}
+local ClanMonitorStarted  = false
+local ClanLastRecapPoints = {}
+local ClanLastSnapshot    = nil
+
+local function FormatPoints(n)
+    local s = tostring(math.floor(tonumber(n) or 0))
+    local k
+    repeat
+        s, k = string.gsub(s, "^(-?%d+)(%d%d%d)", "%1,%2")
+    until k == 0
+    return s
+end
+
+local function ResolveUserName(uid)
+    uid = tonumber(uid)
+    if not uid then return "?" end
+    if ClanNameCache[uid] then return ClanNameCache[uid] end
+    local p = Players:GetPlayerByUserId(uid)
+    local name = p and p.Name
+    if not name then
+        local ok, res = pcall(function() return Players:GetNameFromUserIdAsync(uid) end)
+        if ok and res then name = res end
+    end
+    name = name or tostring(uid)
+    ClanNameCache[uid] = name
+    return name
+end
+
+-- key numerik non-array berubah jadi string setelah lewat remote, jadi coba dua-duanya
+local function LookupMember(tbl, uid)
+    if type(tbl) ~= "table" then return nil end
+    return tbl[uid] or tbl[tostring(uid)]
+end
+
+local function GetClanRank(d, uid)
+    if tonumber(d.leader) == uid then return "Owner" end
+    for k, v in pairs(d) do
+        if type(v) == "table" and string.find(string.lower(tostring(k)), "officer") then
+            if v[uid] or v[tostring(uid)] then return "Officer" end
+            for _, x in pairs(v) do
+                if tonumber(x) == uid then return "Officer" end
+            end
+        end
+    end
+    return nil
+end
+
+local function GetClanReplion(client)
+    local ok, dataRep = pcall(function() return client:GetReplion("Data") end)
+    if not ok or not dataRep then return nil, "data" end
+    local id
+    pcall(function() id = dataRep:Get("ClanId") end)
+    if type(id) ~= "string" or id == "" then return nil, "noclan" end
+    local ok2, rep = pcall(function() return client:GetReplion(id) end)
+    if not ok2 or not rep then return nil, "clanrep", id end
+    return rep, nil, id
+end
+
+local function BuildClanSnapshot(rep)
+    local d = rep.Data
+    if type(d) ~= "table" then return nil end
+    local snap = {
+        level   = tonumber(d.level) or 0,
+        leader  = tonumber(d.leader),
+        members = {}, points = {}, ranks = {},
+        count   = 0, total = 0,
+        name    = tostring(d.name or d.Name or (type(d.xinfo) == "table" and d.xinfo.name) or "Crew"),
+    }
+    for k, v in pairs(d.members or {}) do
+        local uid = tonumber(v)
+        if not uid or uid < 1000 then uid = tonumber(k) end
+        if uid then
+            snap.members[uid] = true
+            snap.count = snap.count + 1
+            local md  = LookupMember(d.memberData, uid)
+            local pts = (type(md) == "table" and type(md.counters) == "table" and tonumber(md.counters.points)) or 0
+            snap.points[uid] = pts
+            snap.total       = snap.total + pts
+            snap.ranks[uid]  = GetClanRank(d, uid)
+        end
+    end
+    return snap
+end
+
+local function SendClanWebhook(title, description, color, fields, thumbUrl)
+    if WEBHOOK_CLAN == "" then return end
+    PostWebhook(WEBHOOK_CLAN, {
+        username   = BRAND_NAME,
+        avatar_url = WEBHOOK_AVATAR,
+        embeds     = { BuildEmbed(title, description, color, fields, nil, thumbUrl, "BLOX GANK - Clan Monitor") },
+    })
+end
+
+local function SendClanRecap(title)
+    local snap = ClanLastSnapshot
+    if not snap then return end
+
+    local list = {}
+    for uid, pts in pairs(snap.points) do table.insert(list, { uid = uid, pts = pts }) end
+    table.sort(list, function(a, b) return a.pts > b.pts end)
+
+    local lines = {}
+    for i, e in ipairs(list) do
+        local delta = ""
+        local prev  = ClanLastRecapPoints[e.uid]
+        if prev then
+            local diff = e.pts - prev
+            delta = string.format(" (%s%s)", diff >= 0 and "+" or "", FormatPoints(diff))
+        end
+        local rank = snap.ranks[e.uid]
+        table.insert(lines, string.format("%d. %s%s - %s%s",
+            i, ResolveUserName(e.uid), rank and (" [" .. rank .. "]") or "", FormatPoints(e.pts), delta))
+    end
+
+    ClanLastRecapPoints = {}
+    for uid, pts in pairs(snap.points) do ClanLastRecapPoints[uid] = pts end
+
+    SendClanWebhook(title, table.concat(lines, "\n"), CLAN_COLOR, {
+        { name = "Crew",       value = snap.name,                inline = true },
+        { name = "Level",      value = tostring(snap.level),     inline = true },
+        { name = "Member",     value = tostring(snap.count),     inline = true },
+        { name = "Total Poin", value = FormatPoints(snap.total), inline = true },
+    })
+end
+
+local function StartClanMonitor()
+    if ClanMonitorStarted or WEBHOOK_CLAN == "" then return end
+    ClanMonitorStarted = true
+
+    task.spawn(function()
+        local okR, Replion = pcall(function() return require(ReplicatedStorage.Packages.Replion) end)
+        if not okR or not Replion then
+            warn("[BLOX Gank] Clan monitor: Replion tidak bisa di-load.")
+            return
+        end
+        local client     = Replion.Client
+        local announced  = false
+        local currentId  = nil
+        local lastRecap  = os.time()
+        local warnedNoClan = false
+
+        while SCRIPT_ACTIVE do
+            local rep, why, id = GetClanReplion(client)
+            if rep then
+                if id ~= currentId then
+                    currentId = id
+                    ClanLastSnapshot = nil
+                    ClanLastRecapPoints = {}
+                    announced = false
+                end
+
+                local snap = BuildClanSnapshot(rep)
+                if snap then
+                    local prev = ClanLastSnapshot
+                    ClanLastSnapshot = snap
+
+                    if not announced then
+                        announced = true
+                        lastRecap = os.time()
+                        SendClanRecap("Clan Monitor Aktif")
+                    elseif prev then
+                        for uid in pairs(snap.members) do
+                            if not prev.members[uid] then
+                                SendClanWebhook("Member Bergabung ke Crew", "", TierColors.Join, {
+                                    { name = "Username", value = ResolveUserName(uid),  inline = true },
+                                    { name = "Member",   value = tostring(snap.count),  inline = true },
+                                }, GetAvatarUrlById(uid))
+                            end
+                        end
+                        for uid in pairs(prev.members) do
+                            if not snap.members[uid] then
+                                SendClanWebhook("Member Keluar dari Crew", "", TierColors.Leave, {
+                                    { name = "Username", value = ResolveUserName(uid),  inline = true },
+                                    { name = "Member",   value = tostring(snap.count),  inline = true },
+                                }, GetAvatarUrlById(uid))
+                            end
+                        end
+                        if snap.level ~= prev.level then
+                            SendClanWebhook("Level Crew Berubah", "", TierColors.Legendary, {
+                                { name = "Sebelum", value = tostring(prev.level), inline = true },
+                                { name = "Sekarang", value = tostring(snap.level), inline = true },
+                            })
+                        end
+                        if os.time() - lastRecap >= CLAN_RECAP_MINUTES * 60 then
+                            lastRecap = os.time()
+                            SendClanRecap("Rekap Poin Crew")
+                        end
+                    end
+                end
+            elseif why == "noclan" and not warnedNoClan then
+                warnedNoClan = true
+                warn("[BLOX Gank] Clan monitor: akun ini tidak punya crew.")
+            end
+            task.wait(CLAN_POLL_SECONDS)
+        end
+    end)
+end
+
+-- ============================================================
 --  HOOK CHAT
 -- ============================================================
 
@@ -739,6 +948,7 @@ local function HookChat()
             local text = msg.Text or ""
             if msg.TextSource == nil then CheckAndSend(text) end
             if Trim(string.lower(text)) == "!checkplayer" then SendPlayerCheckWebhook() end
+            if Trim(string.lower(text)) == "!checkclan" then SendClanRecap("Rekap Poin Crew (manual)") end
         end)
     end
     local chatEvents = ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents")
@@ -752,6 +962,7 @@ local function HookChat()
                     CheckAndSend(d.Message)
                 end
                 if Trim(lowerMsg) == "!checkplayer" then SendPlayerCheckWebhook() end
+                if Trim(lowerMsg) == "!checkclan" then SendClanRecap("Rekap Poin Crew (manual)") end
             end)
         end
     end
@@ -856,7 +1067,8 @@ local TEXT_SECONDARY = Color3.fromRGB(140, 140, 158)
 local SUCCESS        = Color3.fromRGB(76, 224, 137)
 local DANGER         = Color3.fromRGB(235, 80, 90)
 
--- Shadow tetap sibling (parent = target.Parent), ukuran & posisinya di-sync ke target.
+-- FIX: shadow tetap sibling (parent = target.Parent), tapi ukuran & posisinya
+-- di-sync ke target. Versi lama pakai Size = (1, boost) = 100% layar -> blackscreen.
 local function AddShadow(target, sizeBoost)
     sizeBoost = sizeBoost or 34
 
@@ -894,22 +1106,10 @@ local function AddShadow(target, sizeBoost)
     return shadow
 end
 
--- Paksa ZIndex child selalu di atas parent (aman di mode Global maupun Sibling)
-local function FixZ(root, base)
-    local function depth(o)
-        local d = 0
-        while o and o ~= root do d = d + 1; o = o.Parent end
-        return d
-    end
-    for _, o in ipairs(root:GetDescendants()) do
-        if o:IsA("GuiObject") then o.ZIndex = base + depth(o) end
-    end
-end
-
 local function CreateMainUI(gui)
     local savedConfig = LoadConfig()
 
-    local FRAME_H = 304
+    local FRAME_H = 340
     local frame = Instance.new("Frame")
     frame.Name             = "Main"
     frame.Size             = UDim2.new(0, 300, 0, FRAME_H)
@@ -991,7 +1191,7 @@ local function CreateMainUI(gui)
     floatLogo.Image            = BRAND_ICON
     floatLogo.ScaleType        = Enum.ScaleType.Crop
     floatLogo.BorderSizePixel  = 0
-    floatLogo.ZIndex           = 20
+    floatLogo.ZIndex           = 5
     floatLogo.Parent           = gui
     Instance.new("UICorner", floatLogo).CornerRadius = UDim.new(1, 0)
     AddShadow(floatLogo, 18)
@@ -1004,7 +1204,7 @@ local function CreateMainUI(gui)
     floatStatusDot.Position         = UDim2.new(1, -14, 1, -14)
     floatStatusDot.BackgroundColor3 = DANGER
     floatStatusDot.BorderSizePixel  = 0
-    floatStatusDot.ZIndex           = 21
+    floatStatusDot.ZIndex           = 6
     floatStatusDot.Parent           = floatLogo
     Instance.new("UICorner", floatStatusDot).CornerRadius = UDim.new(1, 0)
 
@@ -1054,7 +1254,7 @@ local function CreateMainUI(gui)
         task.wait(0.2); gui:Destroy()
     end)
 
-    -- Drag topBar (support Touch untuk executor mobile)
+    -- FIX: drag topBar sekarang support Touch (executor mobile)
     local dragging, dragStart, startPos
     topBar.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1
@@ -1207,6 +1407,8 @@ local function CreateMainUI(gui)
     local inputFish  = MakeInput("Paste webhook secret fish...")
     MakeLabel("Webhook Check Player")
     local inputCheckplayer = MakeInput("Kosong = pakai webhook join...")
+    MakeLabel("Webhook Clan")
+    local inputClan = MakeInput("Kosong = clan monitor mati...")
 
     local saveEnabled = false
     local saveToggle = MakeToggleRow("Simpan Config", false, function(enabled) saveEnabled = enabled end)
@@ -1215,6 +1417,7 @@ local function CreateMainUI(gui)
         if savedConfig.webhook_join        and savedConfig.webhook_join        ~= "" then inputJoin.Text        = savedConfig.webhook_join        end
         if savedConfig.webhook_fish        and savedConfig.webhook_fish        ~= "" then inputFish.Text        = savedConfig.webhook_fish        end
         if savedConfig.webhook_checkplayer and savedConfig.webhook_checkplayer ~= "" then inputCheckplayer.Text = savedConfig.webhook_checkplayer end
+        if savedConfig.webhook_clan        and savedConfig.webhook_clan        ~= "" then inputClan.Text        = savedConfig.webhook_clan        end
         saveToggle.setState(true)
     end
 
@@ -1277,8 +1480,9 @@ local function CreateMainUI(gui)
         WEBHOOK_URL = inputJoin.Text
         if inputFish.Text:find("discord.com/api/webhooks")        then WEBHOOK_FISH        = inputFish.Text        end
         if inputCheckplayer.Text:find("discord.com/api/webhooks") then WEBHOOK_CHECKPLAYER = inputCheckplayer.Text end
+        if inputClan.Text:find("discord.com/api/webhooks")        then WEBHOOK_CLAN        = inputClan.Text        end
 
-        if saveEnabled then SaveConfig(WEBHOOK_URL, WEBHOOK_FISH, WEBHOOK_CHECKPLAYER) end
+        if saveEnabled then SaveConfig(WEBHOOK_URL, WEBHOOK_FISH, WEBHOOK_CHECKPLAYER, WEBHOOK_CLAN) end
 
         SCRIPT_ACTIVE = true
         statusDot.BackgroundColor3 = SUCCESS
@@ -1290,16 +1494,14 @@ local function CreateMainUI(gui)
 
         SetFloatStatus(true)
 
-        for _, box in ipairs({ inputJoin, inputFish, inputCheckplayer }) do
+        for _, box in ipairs({ inputJoin, inputFish, inputCheckplayer, inputClan }) do
             box.TextEditable = false
         end
         saveToggle.hitbox.Active = false
 
         StartMonitoring()
+        StartClanMonitor()
     end)
-
-    -- Semua child frame dipaksa ZIndex lebih tinggi dari parent-nya
-    FixZ(frame, 2)
 end
 
 -- ============================================================
@@ -1307,10 +1509,9 @@ end
 -- ============================================================
 
 local mainGui = Instance.new("ScreenGui")
-mainGui.Name           = "BloxGankUI"
-mainGui.ResetOnSpawn   = false
-mainGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-mainGui.Parent         = (gethui and gethui()) or CoreGui
+mainGui.Name         = "BloxGankUI"
+mainGui.ResetOnSpawn = false
+mainGui.Parent       = (gethui and gethui()) or CoreGui
 
 local uiOk, uiErr = pcall(CreateMainUI, mainGui)
 if not uiOk then
