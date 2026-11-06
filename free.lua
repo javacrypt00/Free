@@ -1067,6 +1067,9 @@ local TEXT_SECONDARY = Color3.fromRGB(140, 140, 158)
 local SUCCESS        = Color3.fromRGB(76, 224, 137)
 local DANGER         = Color3.fromRGB(235, 80, 90)
 
+-- Shadow dimatikan dulu (salah satu tersangka UI hitam). Ubah ke true kalau mau dicoba lagi.
+local USE_SHADOW = false
+
 -- FIX: shadow tetap sibling (parent = target.Parent), tapi ukuran & posisinya
 -- di-sync ke target. Versi lama pakai Size = (1, boost) = 100% layar -> blackscreen.
 local function AddShadow(target, sizeBoost)
@@ -1125,7 +1128,7 @@ local function CreateMainUI(gui)
     local stroke = Instance.new("UIStroke")
     stroke.Color = BORDER_SUBTLE; stroke.Thickness = 1; stroke.Transparency = 0.2; stroke.Parent = frame
 
-    AddShadow(frame, 44)
+    if USE_SHADOW then pcall(AddShadow, frame, 44) end
 
     local topBar = Instance.new("Frame")
     topBar.Size = UDim2.new(1, 0, 0, 44); topBar.BackgroundColor3 = BG_TOPBAR
@@ -1188,13 +1191,13 @@ local function CreateMainUI(gui)
     floatLogo.Size             = UDim2.new(0, 46, 0, 46)
     floatLogo.Position         = UDim2.new(0, 20, 0, 90)
     floatLogo.BackgroundColor3 = BG_MAIN
-    floatLogo.Image            = BRAND_ICON
+    pcall(function() floatLogo.Image = BRAND_ICON end)
     floatLogo.ScaleType        = Enum.ScaleType.Crop
     floatLogo.BorderSizePixel  = 0
     floatLogo.ZIndex           = 5
     floatLogo.Parent           = gui
     Instance.new("UICorner", floatLogo).CornerRadius = UDim.new(1, 0)
-    AddShadow(floatLogo, 18)
+    if USE_SHADOW then pcall(AddShadow, floatLogo, 18) end
 
     local floatStroke = Instance.new("UIStroke")
     floatStroke.Color = BORDER_SUBTLE; floatStroke.Thickness = 2; floatStroke.Parent = floatLogo
@@ -1508,12 +1511,42 @@ end
 --  INIT
 -- ============================================================
 
-local mainGui = Instance.new("ScreenGui")
-mainGui.Name         = "BloxGankUI"
-mainGui.ResetOnSpawn = false
-mainGui.Parent       = (gethui and gethui()) or CoreGui
+-- hapus UI lama kalau script dijalankan ulang
+pcall(function()
+    local host = (gethui and gethui()) or CoreGui
+    local old = host:FindFirstChild("BloxGankUI")
+    if old then old:Destroy() end
+end)
 
+local mainGui = Instance.new("ScreenGui")
+mainGui.Name           = "BloxGankUI"
+mainGui.ResetOnSpawn   = false
+mainGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling   -- penting: anak harus tampil di atas parent
+mainGui.DisplayOrder   = 10000
+mainGui.IgnoreGuiInset = true
+
+-- bangun UI dulu SEBELUM di-parent, supaya kalau gagal tidak muncul kotak hitam setengah jadi
 local uiOk, uiErr = pcall(CreateMainUI, mainGui)
+
 if not uiOk then
     warn("[BLOX Gank] Gagal bikin UI: " .. tostring(uiErr))
+    mainGui:ClearAllChildren()
+    local errLabel = Instance.new("TextLabel")
+    errLabel.Size                   = UDim2.new(0, 320, 0, 90)
+    errLabel.Position               = UDim2.new(0, 10, 0, 60)
+    errLabel.BackgroundColor3       = Color3.fromRGB(40, 20, 24)
+    errLabel.TextColor3             = Color3.fromRGB(255, 120, 130)
+    errLabel.Font                   = Enum.Font.Code
+    errLabel.TextSize               = 12
+    errLabel.TextWrapped            = true
+    errLabel.TextXAlignment         = Enum.TextXAlignment.Left
+    errLabel.TextYAlignment         = Enum.TextYAlignment.Top
+    errLabel.Text                   = "BLOX GANK - UI gagal dibuat:\n" .. tostring(uiErr)
+    errLabel.Parent                 = mainGui
 end
+
+local parentOk = pcall(function() mainGui.Parent = (gethui and gethui()) or CoreGui end)
+if not parentOk or not mainGui.Parent then
+    pcall(function() mainGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui") end)
+end
+print("[BLOX Gank] UI parent: " .. tostring(mainGui.Parent and mainGui.Parent:GetFullName()) .. " | ok=" .. tostring(uiOk))
